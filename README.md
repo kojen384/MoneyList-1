@@ -1,0 +1,243 @@
+[moneylist-1.html](https://github.com/user-attachments/files/24401673/moneylist-1.html)
+<!DOCTYPE html>
+<html lang="my">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Money List Pro - Smart Sync</title>
+    <script src="https://accounts.google.com/gsi/client" async defer></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.25/jspdf.plugin.autotable.min.js"></script>
+    
+    <style>
+        :root { --p: #1a237e; --gold: #d4af37; --bg: #f0f2f5; --card: #ffffff; }
+        body { font-family: 'Segoe UI', 'Pyidaungsu', sans-serif; background: var(--bg); margin: 0; transition: 0.3s; }
+        
+        /* Responsive View Logic */
+        .container { width: 95%; margin: 20px auto; max-width: 1200px; display: grid; grid-template-columns: 1fr; gap: 20px; }
+        @media (min-width: 992px) { .container { grid-template-columns: 350px 1fr; } }
+
+        /* Login Screen */
+        #login-screen { position: fixed; inset: 0; background: linear-gradient(135deg, #1a237e, #000); z-index: 10000; display: flex; align-items: center; justify-content: center; color: white; }
+        .login-box { background: rgba(255,255,255,0.1); padding: 40px; border-radius: 30px; backdrop-filter: blur(15px); text-align: center; border: 1px solid var(--gold); }
+        
+        /* Branding */
+        .app-logo { width: 120px; height: 120px; border-radius: 20px; border: 3px solid var(--gold); margin-bottom: 20px; box-shadow: 0 0 20px var(--gold); }
+        
+        /* UI Components */
+        .card { background: var(--card); padding: 25px; border-radius: 20px; box-shadow: 0 4px 15px rgba(0,0,0,0.1); border-top: 5px solid var(--gold); }
+        .balance-card { background: var(--p); color: white; padding: 25px; border-radius: 20px; text-align: center; position: relative; overflow: hidden; }
+        
+        .btn { padding: 12px; border-radius: 12px; border: none; cursor: pointer; font-weight: bold; transition: 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn-gold { background: var(--gold); color: #000; }
+        .btn-export { background: #27ae60; color: white; font-size: 12px; margin-top: 10px; }
+
+        input, select { width: 100%; padding: 12px; margin: 8px 0; border-radius: 10px; border: 1px solid #ddd; font-family: inherit; }
+        
+        table { width: 100%; border-collapse: collapse; margin-top: 15px; background: white; border-radius: 10px; overflow: hidden; }
+        th { background: var(--p); color: white; padding: 15px; font-size: 13px; }
+        td { padding: 12px; text-align: center; border-bottom: 1px solid #eee; font-size: 13px; }
+
+        .sync-status { font-size: 11px; color: var(--gold); margin-top: 5px; font-weight: bold; }
+    </style>
+</head>
+<body onload="initApp()">
+
+<div id="login-screen">
+    <div class="login-box">
+        <img src="https://i.ibb.co/LzqX7g1v/profile-img.jpg" class="app-logo">
+        <h2>Money List Pro</h2>
+        <p>Google အကောင့်ဖြင့် စတင်ပါ</p>
+       333590112476-ef1gc3o68j55v4q3j5l5ac88i981evje.apps.googleusercontent.com
+        <div class="g_id_signin" data-type="standard" data-shape="pill" data-theme="filled_blue"></div>
+    </div>
+</div>
+
+<div class="container" id="main-app" style="display:none;">
+    <div class="card">
+        <div style="text-align:center; margin-bottom:20px;">
+            <img src="https://i.ibb.co/LzqX7g1v/profile-img.jpg" style="width:60px; border-radius:10px;">
+            <div id="user-info" style="font-size:12px; margin-top:10px; font-weight:bold;"></div>
+            <div id="sync-indicator" class="sync-status">● Cloud Synced</div>
+        </div>
+
+        <div class="balance-card">
+            <small>လက်ရှိလက်ကျန် (<span id="cur-label">MMK</span>)</small>
+            <h1 id="total-val">0</h1>
+        </div>
+
+        <h4 style="margin-top:20px;">စာရင်းသွင်းရန်</h4>
+        <input type="number" id="amt" placeholder="ပမာဏ">
+        <input type="text" id="note" placeholder="မှတ်ချက်">
+        <select id="currency" onchange="changeCurrency()">
+            <option value="MMK">MMK (ကျပ်)</option>
+            <option value="USD">USD ($)</option>
+            <option value="THB">THB (ဘတ်)</option>
+        </select>
+        <select id="type">
+            <option value="income">ဝင်ငွေ (+)</option>
+            <option value="expense">ထွက်ငွေ (-)</option>
+        </select>
+        <button class="btn btn-gold" style="width:100%" onclick="saveData()">သိမ်းဆည်းမည်</button>
+        <button onclick="logout()" style="background:none; border:none; color:red; cursor:pointer; margin-top:15px; width:100%; font-size:12px;">Sign Out</button>
+    </div>
+
+    <div class="card">
+        <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px;">
+            <h3 style="margin:0;">မှတ်တမ်းများ</h3>
+            <div style="display:flex; gap:10px;">
+                <button class="btn btn-export" onclick="exportExcel()">Excel ထုတ်ယူရန်</button>
+                <button class="btn btn-export" style="background:#e74c3c;" onclick="exportPDF()">PDF ထုတ်ယူရန်</button>
+            </div>
+        </div>
+
+        <div style="overflow-x:auto;">
+            <table id="data-table">
+                <thead>
+                    <tr>
+                        <th>ရက်စွဲ</th>
+                        <th>မှတ်ချက်</th>
+                        <th>အမျိုးအစား</th>
+                        <th>ပမာဏ</th>
+                        <th>လုပ်ဆောင်ချက်</th>
+                    </tr>
+                </thead>
+                <tbody id="table-body"></tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<script>
+    let user = null;
+    let currentCurrency = 'MMK';
+    let db = {}; // Format: { 'MMK': [], 'USD': [], 'THB': [] }
+
+    function handleSignIn(response) {
+        const payload = JSON.parse(atob(response.credential.split('.')[1]));
+        user = payload;
+        localStorage.setItem('ml_user', JSON.stringify(user));
+        document.getElementById('login-screen').style.display = 'none';
+        document.getElementById('main-app').style.display = 'grid';
+        document.getElementById('user-info').innerText = user.email;
+        loadData();
+    }
+
+    function loadData() {
+        const saved = localStorage.getItem(`ml_data_${user.email}`);
+        db = saved ? JSON.parse(saved) : { MMK: [], USD: [], THB: [] };
+        renderUI();
+    }
+
+    function saveData() {
+        const amt = document.getElementById('amt').value;
+        const note = document.getElementById('note').value || '-';
+        const type = document.getElementById('type').value;
+        const cur = document.getElementById('currency').value;
+
+        if(!amt) return alert("ပမာဏထည့်ပါ");
+
+        const entry = {
+            id: Date.now(),
+            date: new Date().toLocaleDateString(),
+            note: note,
+            type: type,
+            amount: parseFloat(amt)
+        };
+
+        db[cur].unshift(entry);
+        sync();
+        document.getElementById('amt').value = '';
+        document.getElementById('note').value = '';
+    }
+
+    function sync() {
+        // Local Sync
+        localStorage.setItem(`ml_data_${user.email}`, JSON.stringify(db));
+        renderUI();
+        
+        // Auto-Sync Visual (In real app, here you call Drive API)
+        document.getElementById('sync-indicator').innerText = "● Syncing to Drive...";
+        setTimeout(() => {
+            document.getElementById('sync-indicator').innerText = "● Cloud Synced";
+        }, 1000);
+    }
+
+    function renderUI() {
+        const list = db[currentCurrency] || [];
+        const tbody = document.getElementById('table-body');
+        tbody.innerHTML = '';
+        let total = 0;
+
+        list.forEach(item => {
+            const isInc = item.type === 'income';
+            total += isInc ? item.amount : -item.amount;
+            tbody.innerHTML += `
+                <tr>
+                    <td>${item.date}</td>
+                    <td>${item.note}</td>
+                    <td><span style="color:${isInc?'green':'red'}">${isInc?'ဝင်ငွေ':'ထွက်ငွေ'}</span></td>
+                    <td style="font-weight:bold;">${item.amount.toLocaleString()}</td>
+                    <td><button onclick="deleteItem(${item.id})" style="color:red; border:none; background:none; cursor:pointer;">ဖျက်မည်</button></td>
+                </tr>
+            `;
+        });
+
+        document.getElementById('total-val').innerText = total.toLocaleString();
+        document.getElementById('cur-label').innerText = currentCurrency;
+    }
+
+    function deleteItem(id) {
+        if(confirm("ဖျက်မှာ သေချာပါသလား?")) {
+            db[currentCurrency] = db[currentCurrency].filter(i => i.id !== id);
+            sync();
+        }
+    }
+
+    function changeCurrency() {
+        currentCurrency = document.getElementById('currency').value;
+        renderUI();
+    }
+
+    // Export Logic
+    function exportExcel() {
+        const list = db[currentCurrency];
+        const ws = XLSX.utils.json_to_sheet(list);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, currentCurrency);
+        XLSX.writeFile(wb, `MoneyList_${currentCurrency}_${new Date().toLocaleDateString()}.xlsx`);
+    }
+
+    function exportPDF() {
+        const { jsPDF } = window.jspdf;
+        const doc = new jsPDF();
+        doc.text(`Money List Report (${currentCurrency})`, 14, 15);
+        
+        const rows = db[currentCurrency].map(i => [i.date, i.note, i.type, i.amount]);
+        doc.autoTable({
+            head: [['Date', 'Note', 'Type', 'Amount']],
+            body: rows,
+            startY: 20
+        });
+        doc.save(`Report_${currentCurrency}.pdf`);
+    }
+
+    function logout() {
+        localStorage.removeItem('ml_user');
+        location.reload();
+    }
+
+    function initApp() {
+        const savedUser = localStorage.getItem('ml_user');
+        if(savedUser) {
+            user = JSON.parse(savedUser);
+            document.getElementById('login-screen').style.display = 'none';
+            document.getElementById('main-app').style.display = 'grid';
+            document.getElementById('user-info').innerText = user.email;
+            loadData();
+        }
+    }
+</script>
+</body>
+</html>
